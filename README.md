@@ -39,8 +39,6 @@ HTTPClient: &http.Client{
 },
 ```
 
-client.HTTPClient.Transport = stats.RoundTripper()
-
 | name                            | type      | labels        |
 |---------------------------------|-----------|---------------|
 | client_in_flight_requests       | guage     |               | 
