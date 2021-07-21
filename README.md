@@ -1,32 +1,62 @@
 # stats
-Prometheus statistic helper lib for Go
+Library of common Prometheus statistics for Jitsi Go services.
+
+These are largely based on prometehus example code.
 
 ## HTTP Server API Statistics
 
-| name                                 | type      | labels                             |
-|--------------------------------------|-----------|------------------------------------|
-| http_server_requests_in_flight       | guage     | instance, job                      |
-| http_server_requests_total           | counter   | instance, job, code, method, uri |
-| http_server_request_duration_seconds | histogram | instance, job, method, uri |
+These metrics are used as a wrapper by HTTP servers fielding API requests. Example usage:
+```
+service := stats.WrapHTTPHandler("endpoint", chain.ThenFunc(handlers.Endpoint))
+```
 
-### Labels
-#### instance
-Added automatically by kube and is the instance that is statting.
-#### job
-This is the name of the scrape job in the prometheus config and should be set the
-same as the name of the service. Querying for job should provide all the stat of that type for the service. This is added automatically.
-#### code
-The http status code of the response. This is used for alerting on specific code counts. The instrumentation code must add this label.
-#### method
-This is the http method used for the request. The instrumentation code must add this label.
-#### uri
-This is the actual api used and is added by instrumentation code
+| name                                 | type      | labels                            |
+|--------------------------------------|-----------|-----------------------------------|
+| http_server_requests_in_flight       | guage     | instance, job                     |
+| http_server_requests_total           | counter   | instance, job, code, method, uri  |
+| http_server_request_duration_seconds | histogram | instance, job, method, uri        |
+### metrics
+* `http_server_requests_in_flight`: current number of requests being handled by the service
+* `http_server_requests_total`: total request counter
+* `http_server_request_duration_seconds`: histogram of request latencies
 
-### http_server_requests_in_flight
-This stat shows the current number of requests in flight for a given job/service.
+Note that the buckets for `http_server_request_duration_seconds need to be tuned
+for precision if a particular issue is being analyzed.
 
-### http_server_requests_total
-This stat is used to show the total number of requests.
+### labels
+* `instance`: the instance that is collecting stats; added by k8s
+* `job`: the name of the service; added by k8s based on the name of the scrape job
+* `code`: HTTP status code of the response; added by instrumentation
+* `method`: HTTP method used for the request; added by instrumentation
+* `uri`: actual API call used by caller; added by instrumentation
 
-### http_server_request_duration_seconds
-This stat is used to provide a histogram of request latency. Note that the buckets need to be tuned if more precision is required from the histogram. This metric, more than the other http_server* metrics need to be researched and understood by anyone using it.
+## HTTP Client RoundTripper Statistics
+
+These metrics are used by HTTP Clients that are executing API calls. Example:
+```
+HTTPClient: &http.Client{
+	Transport: stats.RoundTripper(),
+},
+```
+
+client.HTTPClient.Transport = stats.RoundTripper()
+
+| name                            | type      | labels        |
+|---------------------------------|-----------|---------------|
+| client_in_flight_requests       | guage     |               | 
+| client_requests_total           | counter   | code, method  |
+| client_request_duration_seconds | histogram |               | 
+| dns_duration_seconds            | histogram | event         |
+| tls_duration_seconds 		  | histogram | event         |
+
+### metrics
+* `client_in_flight_requests`: current number of requests being handled by this client
+* `client_requests_total`: total requests made by client
+* `client_request_duration_seconds`: histogram of durations of successful requests
+* `dns_duration_seconds`: histogram of durations of successful DNS queries
+* `tls_duration_seconds`: histogram of durations of successful TLS handshakes
+
+### labels
+* `code`: HTTP status code of the response; added by instrumentation
+* `method`: HTTP method used for the request; added by instrumentation
+* `event`: start/done trace state of DNS or TLS
